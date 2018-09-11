@@ -1,16 +1,18 @@
 
-# Introduction
+# Вступление
 
-It is human instinct to be sceptical of a new paradigm. To put some
-perspective on how far we have come, and the shifts we have already
-accepted on the JVM, let's start with a quick recap of the last 20
-years.
+Быть скептическим насчет новой парадигмы естественно для человека. 
+Чтобы обозначить некоторую перспективу насколько далеко мы зашли и 
+какие изменения мы уже приняли для JVM, давайте начнем с быстрого 
+повторения последних 20 лет. 
 
-Java 1.2 introduced the Collections API, allowing us to write methods
-that abstracted over mutable collections. It was useful for writing
-general purpose algorithms and was the bedrock of our codebases.
+Java 1.2 добавила Collections API, что позволило нам создавать методы, 
+абстрагированные над изменяемыми (((В противовес неизменяемым (immutable)))) коллекциями. Это было удобно для
+создания алгоритмов общего назначения и, по сути, было основой нашего 
+кода. 
 
-But there was a problem, we had to perform runtime casting:
+Но была одна проблема, нам приходилось делать приведение типов во 
+время выполнения программы:
 
 {lang="text"}
 ~~~~~~~~
@@ -19,40 +21,51 @@ But there was a problem, we had to perform runtime casting:
   }
 ~~~~~~~~
 
-In response, developers defined domain objects in their business logic
-that were effectively `CollectionOfThings`, and the Collection API
-became implementation detail.
+В ответ разработчики определяли объекты предметной области 
+прямо в их бизнес-логике, которые фактически были `CollectionOfThings` 
+(((Тут имеется в виду, что такие объекты представляли собой 
+специфичную коллекцию, набор каких-то определенных значений, 
+связанных с предметной областью))),
+а Collection API становился деталью реализации. 
 
-In 2005, Java 5 introduced *generics*, allowing us to define
-`Collection<Thing>`, abstracting over the container **and** its
-elements. Generics changed how we wrote Java.
+В 2005 году Java 5 добавила *generics*
+(((Для этого слова нет нормального перевода.
+Жаргонно говорят "дженерики", но официального слова имеено 
+для generics нет. 
+Есть понятие "обобщенное программирование", 
+но оно не способно отражать смысл сущности как "generics")))
+, что позволило нам определять `Collection<Thing>`, 
+абстрагируясь над контейнером **и** его элементами. 
+Generics изменили то, как мы пишем на Java. 
 
-The author of the Java generics compiler, Martin Odersky, then created
-Scala with a stronger type system, immutable data and multiple
-inheritance. This brought about a fusion of object oriented (OOP) and
-functional programming (FP).
+Автор компилятора для generics в Java, Мартин Одерски, затем создал
+Scala с более сильной системой типов, неизменяемыми данными и 
+множественным наследованием. Это повлекло слияние объекто-ориентированного
+программирования (ООП) и функционального программирования (ФП). 
 
-For most developers, FP means using immutable data as much as
-possible, but mutable state is still a necessary evil that must be
-isolated and managed, e.g. with Akka actors or `synchronized` classes.
-This style of FP results in simpler programs that are easier to
-parallelise and distribute, an improvement over Java. But it is only
-scratching the surface of the benefits of FP, as we will discover in
-this book.
+Для многих разработчиков ФП означает использование неизменяемых данных 
+где только возможно, но изменяемое состояние программы до сих пор является 
+неизбежным злом, которое должно быть изолировано и контролироваться, например 
+с помощью акторов в Akka или `synchronized` классов. 
+Такой стиль ФП порождает более простые программы, которые проще 
+запускать параллельно и в распределнных системах, это является 
+преимуществом над Java. Но это лишь малая часть всех преимуществ ФП, 
+как мы узнаем по ходу этой книги.  
 
-Scala also brings `Future`, making it easy to write asynchronous
-applications. But when a `Future` makes it into a return type,
-*everything* needs to be rewritten to accomodate it, including the
-tests, which are now subject to arbitrary timeouts.
+В Scala также появилась `Future`, что позволило упростить написание
+асинхронных приложений. Но когда `Future` просачивается в возвращаемый тип, 
+необходимо переписывать *все*, чтобы поддержать это, включая тесты, 
+которые теперь подвержены произвольным задержкам.
 
-We have a problem similar to Java 1.0: there is no way of abstracting
-over execution, much as we had no way of abstracting over collections.
+У нас возникает проблема, схожая с Java 1.0: у нас нет способа абстрагироваться 
+над выполнением программы, так же как у нас не было способа абсрагироваться над 
+коллекциями. 
 
+## Абстрагирование над выполнением программы
 
-## Abstracting over Execution
-
-Say we want to interact with the user over the command line interface. We can
-`read` what the user types and we can `write` a message to them.
+Скажем, мы хотим взаимодействовать с пользователем через интерфейс командной 
+строки. Мы можем _читать_(`read`), что набирает пользователь, и мы можем
+_писать_(`write`) сообщения ему. 
 
 {lang="text"}
 ~~~~~~~~
@@ -67,31 +80,34 @@ Say we want to interact with the user over the command line interface. We can
   }
 ~~~~~~~~
 
-How do we write generic code that does something as simple as echo the user's
-input synchronously or asynchronously depending on our runtime implementation?
+Как нам написать такой обощенный код, который бы делал такую простую вещь 
+как повторение введенных пользователем данных синхронно или асинхронно в 
+зависимости от нашей реализации во время выполнения программы?
 
-We could write a synchronous version and wrap it with `Future` but now
-we have to worry about which thread pool we should be using for the
-work, or we could `Await.result` on the `Future` and introduce thread
-blocking. In either case, it is a lot of boilerplate and we are
-fundamentally dealing with different APIs that are not unified.
+Мы могли бы написать синхронную версию и обернуть ее во `Future`, но
+тогда бы нам пришлось заботиться о том, какой пул потоков мы должны 
+использовать для работы, или мы могли бы использовать `Await.result` 
+на этой `Future` и блокировать поток. В любом случае, получается очень 
+шаблонный код, где мы работаем с фундаметально разными API, 
+которые не унифицированы. 
 
-We can solve the problem, like Java 1.2, with a common parent using the *higher
-kinded types* (HKT) Scala language feature.
+Мы можем решить эту проблему, как в Java 1.2, при помощи общего предка, 
+используя *типы высшего порядка* (higher kinded type, HKT) в языке Scala. 
 
-A> **Higher Kinded Types** allow us to use a *type constructor* in our type
-A> parameters, which looks like `C[_]`. This is a way of saying that
-A> whatever `C` is, it must take a type parameter. For example:
-A> 
+A> **Типы Высшего Порядка** позволяют нам использовать *констуктор типа* 
+A> в параметрах типа, что выглядит как `C[_]`. Это способ сказать, что
+A> независимо от того, что такое `C`, оно должно принимать параметр типа. 
+A> Например:
+A>
 A> {lang="text"}
 A> ~~~~~~~~
 A>   trait Foo[C[_]] {
 A>     def create(i: Int): C[Int]
 A>   }
 A> ~~~~~~~~
-A> 
-A> `List` is a type constructor because it takes a type (e.g. `Int`) and constructs
-A> a type (`List[Int]`). We can implement `Foo` using `List`:
+A>
+A> `List` является конструктором типа, потому что он принимает тип (например `Int`)  
+A> и создает новый тип (`List[Int]`). Мы можем реализовать `Foo` использую `List`. 
 A> 
 A> {lang="text"}
 A> ~~~~~~~~
